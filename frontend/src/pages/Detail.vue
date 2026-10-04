@@ -13,17 +13,18 @@
     </div>
 
     <h2 class="serif">发布者改附言</h2>
-    <p v-if="noteMasked(w)" class="tag">封存中,保存将整体替换附言;已认领未核销不可改。</p>
-    <textarea v-model="editNote" rows="3" placeholder="新附言" />
+    <p v-if="editFrozen" class="tag">{{ w.status === 'fulfilled' ? '已核销,附言已成最终历史,不可再改。' : '已认领未核销,封存附言冻结,核销成功后随揭晓放出。' }}</p>
+    <p v-else-if="noteMasked(w)" class="tag">封存中,保存将整体替换附言;新句仍只显示封条,核销成功后才揭晓。</p>
+    <textarea v-model="editNote" rows="3" placeholder="新附言" :disabled="editFrozen" />
     <label class="seal-opt">
-      <input type="checkbox" v-model="editSeal" />
+      <input type="checkbox" v-model="editSeal" :disabled="editFrozen" />
       惊喜附言封存
     </label>
-    <button class="ghost" @click="saveNote">保存附言</button>
+    <button class="ghost" @click="saveNote" :disabled="editFrozen">保存附言</button>
   </div>
 </template>
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api } from '../api'
 import { noteMasked, noteText } from '../seal'
 const props = defineProps({ id: String })
@@ -32,6 +33,11 @@ const claimer = ref('访客')
 const err = ref('')
 const editNote = ref('')
 const editSeal = ref(false)
+// 与后端 note_edit_allowed 同口径:fulfilled 一律冻结;封存行 claimed 期间冻结。
+const editFrozen = computed(() => {
+  const s = w.value.status
+  return s === 'fulfilled' || (!!w.value.seal_note && s === 'claimed')
+})
 async function load() {
   w.value = await api('/wishes/' + props.id)
   // 封存未揭晓时后端不下发明文,编辑框留空即整体替换

@@ -35,12 +35,9 @@ def health(): return {"ok": True, "project": "wishclaim"}
 def list_wishes():
     c = connect(); sweep(c); c.commit()
     rows = [dict(r) for r in c.execute("SELECT * FROM wishes ORDER BY id DESC")]; c.close()
-    out = project_rows(rows)
-    for w in out:
-        if w.get("seal_note") and w.get("status") == "fulfilled":
-            w["note"] = ""
-            w["note_revealed"] = False
-    return out
+    # 墙卡与公开详情/我的认领/已完成走同一投影:核销成功的封存行在此同样放全文,
+    # 禁止任何读路径二次遮蔽。
+    return project_rows(rows)
 
 @app.get("/api/wishes/{wid}")
 def get_wish(wid: int):
@@ -75,7 +72,12 @@ def edit_note(wid: int, body: NoteEditIn):
         c.close(); raise HTTPException(409, allowed["reason"])
     note = r["note"] if body.note is None else body.note
     seal = r["seal_note"] if body.seal_note is None else int(body.seal_note)
-    c.execute("UPDATE wishes SET note=?, seal_note=? WHERE id=?", (note, seal, wid))
+    # 能走到这里必未核销,揭晓戳必须为空:改写封存/解封切换都不允许携带旧揭晓标记,
+    # 杜绝「半份新正文 + 半份旧封条」的版本漂移。
+    c.execute(
+        "UPDATE wishes SET note=?, seal_note=?, note_revealed_at=NULL WHERE id=?",
+        (note, seal, wid),
+    )
     c.commit(); c.close()
     return {"ok": True, "seal_note": bool(seal)}
 
@@ -112,9 +114,15 @@ def fulfill(wid: int):
     if not r: c.close(); raise HTTPException(404, "not found")
     if r["status"] != "claimed":
         c.close(); raise HTTPException(400, "need_claim")
-    c.execute("UPDATE wishes SET status='fulfilled' WHERE id=?", (wid,))
-    apply_reveal(c, r, now())
-    c.commit(); c.close(); return {"ok": True, "status": "fulfilled"}
+    # 状态翻转与揭晓落库同一事务:任一步失败整体回滚,封存行保持封条,
+    # 不存在「详情已闪过明文、核销失败后收不回」的中间态。
+    try:
+        c.execute("UPDATE wishes SET status='fulfilled' WHERE id=?", (wid,))
+        apply_reveal(c, r, now())
+        c.commit()
+    except Exception:
+        c.rollback(); c.close(); raise
+    c.close(); return {"ok": True, "status": "fulfilled"}
 
 @app.get("/api/mine")
 def mine(claimer: str):

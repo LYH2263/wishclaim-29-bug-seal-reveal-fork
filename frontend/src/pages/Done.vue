@@ -3,7 +3,7 @@
     <h1 class="serif">已完成</h1>
     <article v-for="w in rows" :key="w.id" class="card">
       <h3>{{ w.title }}</h3>
-      <p>{{ w.note }}</p>
+      <p :class="{ sealed: noteMasked(w) }">{{ noteText(w) }}</p>
       <p class="tag">{{ w.claimer }}<template v-if="w.note_revealed_at"> · 揭晓于 {{ w.note_revealed_at }}</template></p>
     </article>
   </div>
