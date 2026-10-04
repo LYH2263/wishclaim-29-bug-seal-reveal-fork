@@ -2,8 +2,12 @@
 
 拍板口径:
 1. 认领人核销前同样不可读封存附言——任何人、任何读路径,核销前一律遮蔽。
-2. 已认领未核销的封存附言禁止改写(含解封);仅 open/released 可改;
+2. 已认领未核销(claimed)的封存附言禁止改写(含解封);仅 open/released 可改;
    fulfilled 后附言成为最终历史,一律不可改。
+3. 揭晓只发生在核销成功落库时:核销失败、锁过期释放都保持封存,
+   不存在「先揭晓后收回」——前端不乐观揭晓,只渲染服务端投影。
+4. 未核销前(open/released)改附言:墙占位与公开详情盖的是库内同一份新句,
+   揭晓时揭的是最终保存的版本,两处在结构上不可能各持一版。
 """
 
 REVEAL_STATUS = "fulfilled"
@@ -17,7 +21,7 @@ def is_revealed(seal_note: bool, status: str, note_revealed_at: str | None) -> b
     """
     if not seal_note:
         return False
-    return bool(note_revealed_at)
+    return bool(note_revealed_at) or status == REVEAL_STATUS
 
 
 def note_visible(seal_note: bool, status: str, note_revealed_at: str | None) -> bool:
@@ -32,5 +36,5 @@ def note_edit_allowed(seal_note: bool, status: str) -> dict:
     if status == REVEAL_STATUS:
         return {"ok": False, "reason": "fulfilled_immutable"}
     if seal_note and status == "claimed":
-        return {"ok": True, "reason": "claimed_note_patch"}
+        return {"ok": False, "reason": "claimed_sealed_locked"}
     return {"ok": True, "reason": ""}

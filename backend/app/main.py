@@ -35,12 +35,8 @@ def health(): return {"ok": True, "project": "wishclaim"}
 def list_wishes():
     c = connect(); sweep(c); c.commit()
     rows = [dict(r) for r in c.execute("SELECT * FROM wishes ORDER BY id DESC")]; c.close()
-    out = project_rows(rows)
-    for w in out:
-        if w.get("seal_note") and w.get("status") == "fulfilled":
-            w["note"] = ""
-            w["note_revealed"] = False
-    return out
+    # 墙卡与详情/我的认领/已完成共用同一投影,不在端点里另写口径
+    return project_rows(rows)
 
 @app.get("/api/wishes/{wid}")
 def get_wish(wid: int):
@@ -139,6 +135,7 @@ def rules():
         "ttl": "认领超时未核销则自动释放",
         "fulfill": "核销后状态变为 fulfilled",
         "seal_note": "惊喜附言封存:勾选后墙卡/公开详情/我的认领一律遮蔽明文,认领人核销前同样不可读",
-        "seal_reveal": "核销时揭晓落库,已完成页与详情同步展示附言全文",
-        "seal_edit": "封存附言在已认领未核销期间禁止改写;未认领(open/released)可改,已核销不可再改",
+        "seal_reveal": "核销成功落库时揭晓,墙卡/公开详情/我的认领/已完成同步展示附言全文",
+        "seal_fail": "核销未成功不揭晓:核销失败、锁过期释放都保持封存,不存在先揭后收",
+        "seal_edit": "封存附言在已认领未核销期间禁止改写(含解封);未认领(open/released)可改,已核销不可再改",
     }

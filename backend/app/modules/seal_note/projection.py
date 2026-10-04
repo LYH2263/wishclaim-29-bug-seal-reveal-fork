@@ -13,9 +13,7 @@ def project_wish(row: dict) -> dict:
     revealed_at = w.get("note_revealed_at")
     w["seal_note"] = sealed
     w["note_revealed"] = is_revealed(sealed, status, revealed_at)
-    if status == "fulfilled":
-        w["note_revealed"] = True
-    if not note_visible(sealed, status, revealed_at) and status != "fulfilled":
+    if not note_visible(sealed, status, revealed_at):
         w["note"] = ""
     return w
 
